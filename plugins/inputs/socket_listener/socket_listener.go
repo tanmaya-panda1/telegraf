@@ -20,6 +20,7 @@ import (
 	tlsint "github.com/influxdata/telegraf/plugins/common/tls"
 	"github.com/influxdata/telegraf/plugins/inputs"
 	"github.com/influxdata/telegraf/plugins/parsers"
+	"github.com/influxdata/telegraf/plugins/parsers/influx"
 )
 
 // DO NOT REMOVE THE NEXT TWO LINES! This is required to embed the sampleConfig data.
@@ -389,7 +390,8 @@ func (sl *SocketListener) Stop() {
 }
 
 func newSocketListener() *SocketListener {
-	parser, _ := parsers.NewInfluxParser()
+	parser := &influx.Parser{}
+	_ = parser.Init()
 
 	return &SocketListener{
 		Parser: parser,
