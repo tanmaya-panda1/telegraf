@@ -120,10 +120,6 @@ type Config struct {
 	// Include the metric timestamp on each sample.
 	PrometheusExportTimestamp bool `toml:"prometheus_export_timestamp"`
 
-	// Sort prometheus metric families and metric samples.  Useful for
-	// debugging.
-	PrometheusSortMetrics bool `toml:"prometheus_sort_metrics"`
-
 	// Output string fields as metric labels; when false string fields are
 	// discarded.
 	PrometheusStringAsLabel bool `toml:"prometheus_string_as_label"`

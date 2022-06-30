@@ -1363,9 +1363,8 @@ func (c *Config) buildSerializer(tbl *ast.Table) (serializers.Serializer, error)
 	c.getFieldBool(tbl, "wavefront_use_strict", &sc.WavefrontUseStrict)
 	c.getFieldBool(tbl, "wavefront_disable_prefix_conversion", &sc.WavefrontDisablePrefixConversion)
 
-	c.getFieldBool(tbl, "prometheus_export_timestamp", &sc.PrometheusExportTimestamp)
-	c.getFieldBool(tbl, "prometheus_sort_metrics", &sc.PrometheusSortMetrics)
-	c.getFieldBool(tbl, "prometheus_string_as_label", &sc.PrometheusStringAsLabel)
+	c.getFieldBool(tbl, "prometheus_export_timestamp", &sc.PrometheusExportTimestamp) // remote write
+	c.getFieldBool(tbl, "prometheus_string_as_label", &sc.PrometheusStringAsLabel)    // remote write
 
 	if c.hasErrs() {
 		return nil, c.firstErr()
@@ -1429,7 +1428,6 @@ func (c *Config) missingTomlField(_ reflect.Type, key string) error {
 		"grok_custom_pattern_files", "grok_custom_patterns", "grok_named_patterns", "grok_patterns",
 		"grok_timezone", "grok_unique_timestamp",
 		"influx_parser_type",
-		"prometheus_ignore_timestamp", // not used anymore?
 		"value_field_name":
 
 	// Serializer options to ignore
@@ -1439,7 +1437,8 @@ func (c *Config) missingTomlField(_ reflect.Type, key string) error {
 		"graphite_tag_sanitize_mode", "graphite_tag_support", "graphite_separator",
 		"influx_max_line_bytes", "influx_sort_fields", "influx_uint_support",
 		"json_timestamp_format", "json_timestamp_units",
-		"prometheus_export_timestamp", "prometheus_sort_metrics", "prometheus_string_as_label",
+		"prometheus_export_timestamp", // remote write
+		"prometheus_string_as_label",  // remote write
 		"splunkmetric_hec_routing", "splunkmetric_multimetric",
 		"wavefront_disable_prefix_conversion", "wavefront_source_override", "wavefront_use_strict":
 	default:
