@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"testing"
 	"time"
 
@@ -22,6 +23,7 @@ const createTableCommandExpected = `.create-merge table ['%s']  (['fields']:dyna
 const createTableMappingCommandExpected = `.create-or-alter table ['%s'] ingestion json mapping '%s_mapping' '[{"column":"fields", "Properties":{"Path":"$[\'fields\']"}},{"column":"name", "Properties":{"Path":"$[\'name\']"}},{"column":"tags", "Properties":{"Path":"$[\'tags\']"}},{"column":"timestamp", "Properties":{"Path":"$[\'timestamp\']"}}]'`
 
 func TestWrite(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name               string
 		inputMetric        []telegraf.Metric
@@ -194,17 +196,90 @@ func TestWrite(t *testing.T) {
 	}
 }
 
-func TestInitBlankEndpoint(t *testing.T) {
+func TestSampleConfig(t *testing.T) {
 	plugin := AzureDataExplorer{
 		Log:            testutil.Logger{},
+		Endpoint:       "someendpoint",
+		Database:       "databasename",
 		client:         &fakeClient{},
 		ingesters:      map[string]localIngestor{},
 		createIngestor: createFakeIngestor,
 	}
+	sampleConfig := plugin.SampleConfig()
+	require.NotNil(t, sampleConfig)
+	b, err := ioutil.ReadFile("sample.conf") // just pass the file name
+	require.Nil(t, err)                      // read should not error out
+	expectedString := string(b)
+	require.Equal(t, expectedString, sampleConfig)
+}
 
-	errorInit := plugin.Init()
-	require.Error(t, errorInit)
-	require.Equal(t, "Endpoint configuration cannot be empty", errorInit.Error())
+func TestInitValidations(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name          string             // name of the test
+		adx           *AzureDataExplorer // the struct to test
+		expectedError string             // the error to expect
+	}{
+		{
+			name: "empty_endpoint_configuration",
+			adx: &AzureDataExplorer{
+				Log:            testutil.Logger{},
+				Endpoint:       "",
+				Database:       "databasename",
+				client:         &fakeClient{},
+				ingesters:      map[string]localIngestor{},
+				createIngestor: createFakeIngestor,
+			},
+			expectedError: "endpoint configuration cannot be empty",
+		},
+		{
+			name: "empty_database_configuration",
+			adx: &AzureDataExplorer{
+				Log:            testutil.Logger{},
+				Endpoint:       "endpoint",
+				Database:       "",
+				client:         &fakeClient{},
+				ingesters:      map[string]localIngestor{},
+				createIngestor: createFakeIngestor,
+			},
+			expectedError: "database configuration cannot be empty",
+		},
+		{
+			name: "empty_table_configuration",
+			adx: &AzureDataExplorer{
+				Log:             testutil.Logger{},
+				Endpoint:        "endpoint",
+				Database:        "database",
+				MetricsGrouping: "SingleTable",
+				client:          &fakeClient{},
+				ingesters:       map[string]localIngestor{},
+				createIngestor:  createFakeIngestor,
+			},
+			expectedError: "table name cannot be empty for SingleTable metrics grouping type",
+		},
+		{
+			name: "incorrect_metrics_grouping",
+			adx: &AzureDataExplorer{
+				Log:             testutil.Logger{},
+				Endpoint:        "endpoint",
+				Database:        "database",
+				MetricsGrouping: "MultiTable",
+				client:          &fakeClient{},
+				ingesters:       map[string]localIngestor{},
+				createIngestor:  createFakeIngestor,
+			},
+			expectedError: "metrics grouping type is not valid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.adx.Init()
+			require.Error(t, err)
+			require.Equal(t, tt.expectedError, err.Error())
+		})
+	}
+
 }
 
 func TestConnect(t *testing.T) {
@@ -231,10 +306,37 @@ func TestInit(t *testing.T) {
 		ingesters:      map[string]localIngestor{},
 		createIngestor: createFakeIngestor,
 	}
-
 	initResponse := plugin.Init()
 	require.Equal(t, initResponse, nil)
-	//require.Equal(t, "MSI not available", connection.Error())
+}
+
+func TestCreateRealIngestorManaged(t *testing.T) {
+	kustoLocalClient := kusto.NewMockClient()
+	localIngestor, err := createRealIngestor(kustoLocalClient, "telegrafdb", "metrics", "managed")
+	require.Nil(t, err)
+	require.NotNil(t, localIngestor)
+}
+
+func TestCreateRealIngestorQueued(t *testing.T) {
+	kustoLocalClient := kusto.NewMockClient()
+	localIngestor, err := createRealIngestor(kustoLocalClient, "telegrafdb", "metrics", "queued")
+	require.Nil(t, err)
+	require.NotNil(t, localIngestor)
+}
+func TestClose(t *testing.T) {
+	adx := AzureDataExplorer{
+		Log:            testutil.Logger{},
+		Endpoint:       "someendpoint",
+		Database:       "databasename",
+		client:         &fakeClient{},
+		ingesters:      map[string]localIngestor{},
+		createIngestor: createFakeIngestor,
+	}
+	err := adx.Close()
+	require.Nil(t, err)
+	// client becomes nil in the end
+	require.Nil(t, adx.client)
+	require.Nil(t, adx.ingesters)
 }
 
 type fakeClient struct {
@@ -244,6 +346,9 @@ type fakeClient struct {
 
 func (f *fakeClient) Mgmt(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
 	return f.internalMgmt(f, ctx, db, query, options...)
+}
+func (f *fakeClient) Close() error {
+	return nil
 }
 
 type fakeIngestor struct {
@@ -262,4 +367,8 @@ func (f *fakeIngestor) FromReader(_ context.Context, reader io.Reader, _ ...inge
 		return nil, err
 	}
 	return &ingest.Result{}, nil
+}
+
+func (f *fakeIngestor) Close() error {
+	return nil
 }

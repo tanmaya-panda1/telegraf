@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto"
+	kustoerrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
 	"github.com/Azure/azure-kusto-go/kusto/unsafe"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -52,10 +53,12 @@ const (
 
 type localIngestor interface {
 	FromReader(ctx context.Context, reader io.Reader, options ...ingest.FileOption) (*ingest.Result, error)
+	Close() error
 }
 
 type localClient interface {
 	Mgmt(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
+	Close() error
 }
 
 type ingestorFactory func(localClient, string, string, string) (localIngestor, error)
@@ -88,10 +91,24 @@ func (adx *AzureDataExplorer) Connect() error {
 }
 
 func (adx *AzureDataExplorer) Close() error {
+	var err error
+	for _, v := range adx.ingesters {
+		err = v.Close()
+	}
+	err2 := adx.client.Close()
+	if err == nil {
+		err = err2
+	} else {
+		err = kustoerrors.GetCombinedError(err, err2)
+	}
+	if err != nil {
+		adx.Log.Warn("error closing connections")
+	} else {
+		adx.Log.Info("closed ingestor and client")
+	}
 	adx.client = nil
 	adx.ingesters = nil
-
-	return nil
+	return err
 }
 
 func (adx *AzureDataExplorer) Write(metrics []telegraf.Metric) error {
@@ -204,21 +221,21 @@ func (adx *AzureDataExplorer) createAzureDataExplorerTable(ctx context.Context, 
 
 func (adx *AzureDataExplorer) Init() error {
 	if adx.Endpoint == "" {
-		return errors.New("Endpoint configuration cannot be empty")
+		return errors.New("endpoint configuration cannot be empty")
 	}
 	if adx.Database == "" {
-		return errors.New("Database configuration cannot be empty")
+		return errors.New("database configuration cannot be empty")
 	}
 
 	adx.MetricsGrouping = strings.ToLower(adx.MetricsGrouping)
 	if adx.MetricsGrouping == singleTable && adx.TableName == "" {
-		return errors.New("Table name cannot be empty for SingleTable metrics grouping type")
+		return errors.New("table name cannot be empty for SingleTable metrics grouping type")
 	}
 	if adx.MetricsGrouping == "" {
 		adx.MetricsGrouping = tablePerMetric
 	}
 	if !(adx.MetricsGrouping == singleTable || adx.MetricsGrouping == tablePerMetric) {
-		return errors.New("Metrics grouping type is not valid")
+		return errors.New("metrics grouping type is not valid")
 	}
 
 	serializer, err := json.NewSerializer(time.Nanosecond, time.RFC3339Nano)
@@ -242,14 +259,11 @@ func createRealIngestor(client localClient, database string, tableName string, i
 	var ingestor localIngestor
 	var err error
 	if strings.ToLower(ingestionType) == "managed" {
-		ingestor, err = ingest.NewManaged(client.(*kusto.Client), database, tableName, ingest.WithStaticBuffer(bufferSize, maxBuffers))
+		ingestor, err = ingest.NewManaged(client.(*kusto.Client), database, tableName)
 	} else {
 		ingestor, err = ingest.New(client.(*kusto.Client), database, tableName, ingest.WithStaticBuffer(bufferSize, maxBuffers))
 	}
-
 	if ingestor != nil {
-		//fmt.Println(ingestor)
-		//adx.createIngestor = ingestor
 		return ingestor, nil
 	}
 	return nil, err
