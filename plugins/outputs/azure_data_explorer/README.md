@@ -41,6 +41,10 @@ of logs, metrics and time series data.
   ## Creates tables and relevant mapping if set to true(default).
   ## Skips table and mapping creation if set to false, this is useful for running Telegraf with the lowest possible permissions i.e. table ingestor role.
   # create_tables = true
+
+  ## Ingestion into ADX can happen in managed [streaming](https://docs.microsoft.com/azure/data-explorer/kusto/management/streamingingestionpolicy) or [queued](https://docs.microsoft.com/azure/data-explorer/kusto/management/batchingpolicy) modes. Note: [Streaming ingestion](https://docs.microsoft.com/azure/data-explorer/ingest-data-streaming?tabs=azure-portal%2Ccsharp) has to be enabled on ADX [configure the ADX cluster] in case of "streaming" option. Refer the query below to check if streaming is enabled 
+
+  # ingestion_type = "managed"
 ```
 
 ## Metrics Grouping
