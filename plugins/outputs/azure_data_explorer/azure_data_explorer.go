@@ -225,7 +225,7 @@ func (adx *AzureDataExplorer) Init() error {
 		return errors.New("metrics grouping type is not valid")
 	}
 
-	serializer, err := json.NewSerializer(time.Nanosecond, time.RFC3339Nano)
+	serializer, err := json.NewSerializer(time.Nanosecond, time.RFC3339Nano, "")
 	if err != nil {
 		return err
 	}
