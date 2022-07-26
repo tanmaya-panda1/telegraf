@@ -37,7 +37,7 @@ type AzureDataExplorer struct {
 	CreateTables    bool            `toml:"create_tables"`
 	IngestionType   string          `toml:"ingestion_type"`
 	client          *kusto.Client
-	ingesters       map[string]ingest.Ingestor
+	ingestors       map[string]ingest.Ingestor
 	serializer      serializers.Serializer
 }
 
@@ -52,6 +52,7 @@ const (
 const createTableCommand = `.create-merge table ['%s']  (['fields']:dynamic, ['name']:string, ['tags']:dynamic, ['timestamp']:datetime);`
 const createTableMappingCommand = `.create-or-alter table ['%s'] ingestion json mapping '%s_mapping' '[{"column":"fields", "Properties":{"Path":"$[\'fields\']"}},{"column":"name", "Properties":{"Path":"$[\'name\']"}},{"column":"tags", "Properties":{"Path":"$[\'tags\']"}},{"column":"timestamp", "Properties":{"Path":"$[\'timestamp\']"}}]'`
 const managedIngestion = "managed"
+const queuedIngestion = "queued"
 
 func (*AzureDataExplorer) SampleConfig() string {
 	return sampleConfig
@@ -72,14 +73,14 @@ func (adx *AzureDataExplorer) Connect() error {
 		return err
 	}
 	adx.client = client
-	adx.ingesters = make(map[string]ingest.Ingestor)
+	adx.ingestors = make(map[string]ingest.Ingestor)
 	return nil
 }
 
 // Clean up and close the ingestor
 func (adx *AzureDataExplorer) Close() error {
 	var err error
-	for _, v := range adx.ingesters {
+	for _, v := range adx.ingestors {
 		err = v.Close()
 	}
 	err2 := adx.client.Close()
@@ -94,7 +95,7 @@ func (adx *AzureDataExplorer) Close() error {
 		adx.Log.Info("closed ingestor and client")
 	}
 	adx.client = nil
-	adx.ingesters = nil
+	adx.ingestors = nil
 	return err
 }
 
@@ -172,7 +173,7 @@ func (adx *AzureDataExplorer) pushMetrics(ctx context.Context, format ingest.Fil
 }
 
 func (adx *AzureDataExplorer) getIngestor(ctx context.Context, tableName string) (ingest.Ingestor, error) {
-	ingestor := adx.ingesters[tableName]
+	ingestor := adx.ingestors[tableName]
 	if ingestor == nil {
 		if err := adx.createAzureDataExplorerTable(ctx, tableName); err != nil {
 			return nil, fmt.Errorf("creating table for %q failed: %v", tableName, err)
@@ -182,7 +183,7 @@ func (adx *AzureDataExplorer) getIngestor(ctx context.Context, tableName string)
 		if err != nil {
 			return nil, fmt.Errorf("creating ingestor for %q failed: %v", tableName, err)
 		}
-		adx.ingesters[tableName] = tempIngestor
+		adx.ingestors[tableName] = tempIngestor
 		adx.Log.Infof("Ingestor for table %s created", tableName)
 		ingestor = tempIngestor
 	}
@@ -252,12 +253,14 @@ func createIngestorByTable(client *kusto.Client, database string, tableName stri
 			return nil, err
 		}
 		ingestor = mi
-	} else {
+	} else if strings.ToLower(ingestionType) == queuedIngestion {
 		qi, err := ingest.New(client, database, tableName, ingest.WithStaticBuffer(bufferSize, maxBuffers))
 		if err != nil {
 			return nil, err
 		}
 		ingestor = qi
+	} else {
+		err = errors.New(`ingestion_type has to be one of managed or queued`)
 	}
 	if ingestor != nil {
 		return ingestor, nil
