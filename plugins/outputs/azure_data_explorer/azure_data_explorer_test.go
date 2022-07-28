@@ -115,7 +115,6 @@ func TestWrite(t *testing.T) {
 					require.JSONEq(t, jV, records)
 				}
 			}
-
 		})
 	}
 }
@@ -200,7 +199,6 @@ func TestInitValidations(t *testing.T) {
 			require.Equal(t, testCase.expectedError, err.Error())
 		})
 	}
-
 }
 
 func TestConnect(t *testing.T) {
@@ -284,13 +282,13 @@ func (m *mockIngestor) FromFile(ctx context.Context, fPath string, options ...in
 	return &ingest.Result{}, nil
 }
 
-func (f *mockIngestor) SetRecords(records []string) {
-	f.records = records
+func (m *mockIngestor) SetRecords(records []string) {
+	m.records = records
 }
 
 // Name receives a copy of Foo since it doesn't need to modify it.
-func (f *mockIngestor) Records() []string {
-	return f.records
+func (m *mockIngestor) Records() []string {
+	return m.records
 }
 
 func (m *mockIngestor) Close() error {
