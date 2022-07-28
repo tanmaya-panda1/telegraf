@@ -17,7 +17,6 @@ import (
 )
 
 func TestWrite(t *testing.T) {
-	t.Parallel()
 	metricName := "test1"
 	fakeClient := kusto.NewMockClient()
 	expectedResultMap := map[string]string{metricName: `{"fields":{"value":1},"name":"test1","tags":{"tag1":"value1"},"timestamp":1257894000}`}
@@ -79,9 +78,10 @@ func TestWrite(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			serializer, err := telegrafJson.NewSerializer(time.Second, "", "")
 			require.NoError(t, err)
-			for tN, jV := range testCase.tableNameToExpectedResult {
+			for tableName, jsonValue := range testCase.tableNameToExpectedResult {
 				ingestionType := "queued"
 				if testCase.ingestionType != "" {
 					ingestionType = testCase.ingestionType
@@ -93,11 +93,11 @@ func TestWrite(t *testing.T) {
 					Log:             testutil.Logger{},
 					IngestionType:   ingestionType,
 					MetricsGrouping: testCase.metricsGrouping,
-					TableName:       tN,
+					TableName:       tableName,
 					CreateTables:    testCase.createTables,
 					client:          fakeClient,
 					ingestors: map[string]ingest.Ingestor{
-						tN: mockIngestor,
+						tableName: mockIngestor,
 					},
 					serializer: serializer,
 				}
@@ -106,13 +106,13 @@ func TestWrite(t *testing.T) {
 					require.EqualError(t, errorInWrite, testCase.expectedWriteError)
 				} else {
 					require.NoError(t, errorInWrite)
-					createdIngestor := plugin.ingestors[tN]
+					createdIngestor := plugin.ingestors[tableName]
 					if testCase.metricsGrouping == singleTable {
-						createdIngestor = plugin.ingestors[tN]
+						createdIngestor = plugin.ingestors[tableName]
 					}
 					records := mockIngestor.records[0] // the first element
 					require.NotNil(t, createdIngestor)
-					require.JSONEq(t, jV, records)
+					require.JSONEq(t, jsonValue, records)
 				}
 			}
 		})
@@ -121,6 +121,7 @@ func TestWrite(t *testing.T) {
 
 func TestSampleConfig(t *testing.T) {
 	fakeClient := kusto.NewMockClient()
+	t.Parallel()
 	plugin := AzureDataExplorer{
 		Log:       testutil.Logger{},
 		Endpoint:  "someendpoint",
@@ -137,7 +138,6 @@ func TestSampleConfig(t *testing.T) {
 }
 
 func TestInitValidations(t *testing.T) {
-	t.Parallel()
 	fakeClient := kusto.NewMockClient()
 	testCases := []struct {
 		name          string             // name of the test
@@ -193,7 +193,9 @@ func TestInitValidations(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
+		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			err := testCase.adx.Init()
 			require.Error(t, err)
 			require.Equal(t, testCase.expectedError, err.Error())
@@ -202,6 +204,7 @@ func TestInitValidations(t *testing.T) {
 }
 
 func TestConnect(t *testing.T) {
+	t.Parallel()
 	fakeClient := kusto.NewMockClient()
 	plugin := AzureDataExplorer{
 		Log:       testutil.Logger{},
@@ -217,6 +220,7 @@ func TestConnect(t *testing.T) {
 }
 
 func TestInit(t *testing.T) {
+	t.Parallel()
 	fakeClient := kusto.NewMockClient()
 	plugin := AzureDataExplorer{
 		Log:       testutil.Logger{},
@@ -230,6 +234,7 @@ func TestInit(t *testing.T) {
 }
 
 func TestCreateRealIngestorManaged(t *testing.T) {
+	t.Parallel()
 	kustoLocalClient := kusto.NewMockClient()
 	localIngestor, err := createIngestorByTable(kustoLocalClient, "telegrafdb", "metrics", "managed")
 	require.Nil(t, err)
@@ -237,6 +242,7 @@ func TestCreateRealIngestorManaged(t *testing.T) {
 }
 
 func TestCreateRealIngestorQueued(t *testing.T) {
+	t.Parallel()
 	kustoLocalClient := kusto.NewMockClient()
 	localIngestor, err := createIngestorByTable(kustoLocalClient, "telegrafdb", "metrics", "queued")
 	require.Nil(t, err)
@@ -244,6 +250,7 @@ func TestCreateRealIngestorQueued(t *testing.T) {
 }
 
 func TestInvalidIngestorType(t *testing.T) {
+	t.Parallel()
 	kustoLocalClient := kusto.NewMockClient()
 	localIngestor, err := createIngestorByTable(kustoLocalClient, "telegrafdb", "metrics", "streaming")
 	require.NotNil(t, err)
@@ -252,6 +259,7 @@ func TestInvalidIngestorType(t *testing.T) {
 }
 
 func TestClose(t *testing.T) {
+	t.Parallel()
 	fakeClient := kusto.NewMockClient()
 	adx := AzureDataExplorer{
 		Log:       testutil.Logger{},

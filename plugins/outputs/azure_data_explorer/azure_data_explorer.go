@@ -109,9 +109,9 @@ func (adx *AzureDataExplorer) Write(metrics []telegraf.Metric) error {
 func (adx *AzureDataExplorer) writeTablePerMetric(metrics []telegraf.Metric) error {
 	tableMetricGroups := make(map[string][]byte)
 	// Group metrics by name and serialize them
-	for _, m := range metrics {
-		tableName := m.Name()
-		metricInBytes, err := adx.serializer.Serialize(m)
+	for _, metric := range metrics {
+		tableName := metric.Name()
+		metricInBytes, err := adx.serializer.Serialize(metric)
 		if err != nil {
 			return err
 		}
@@ -138,8 +138,8 @@ func (adx *AzureDataExplorer) writeTablePerMetric(metrics []telegraf.Metric) err
 func (adx *AzureDataExplorer) writeSingleTable(metrics []telegraf.Metric) error {
 	//serialise each metric in metrics - store in byte[]
 	metricsArray := make([]byte, 0)
-	for _, m := range metrics {
-		metricsInBytes, err := adx.serializer.Serialize(m)
+	for _, metric := range metrics {
+		metricsInBytes, err := adx.serializer.Serialize(metric)
 		if err != nil {
 			return err
 		}
