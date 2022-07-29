@@ -100,6 +100,9 @@ corresponding table mapping as per the above mentioned commands.
 ## Ingestion type
 
 **Note**: [Streaming ingestion](https://docs.microsoft.com/azure/data-explorer/ingest-data-streaming?tabs=azure-portal%2Ccsharp) has to be enabled on ADX [configure the ADX cluster] in case of `managed` option. Refer the query below to check if streaming is enabled 
+```
+.show database <DB-Name> policy streamingingestion
+```
 
 ## Authentication
 
