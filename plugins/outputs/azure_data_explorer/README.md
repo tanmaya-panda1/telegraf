@@ -41,6 +41,10 @@ of logs, metrics and time series data.
   ## Creates tables and relevant mapping if set to true(default).
   ## Skips table and mapping creation if set to false, this is useful for running Telegraf with the lowest possible permissions i.e. table ingestor role.
   # create_tables = true
+
+  ## Ingestion to ADX is supported through managed (streaming with a fallback to batched ingestion or queued) or through queued (default) ingestion
+
+  # ingestion_type = queued
 ```
 
 ## Metrics Grouping
